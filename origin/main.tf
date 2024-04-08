@@ -1,9 +1,9 @@
-resource "kubernetes_deployment" "local" {
+resource "kubernetes_deployment" "this" {
   metadata {
-    name = var.app
+    name = local.k8s_app
     labels = {
-      app     = var.app
-      service = var.service
+      app     = local.k8s_app
+      service = local.k8s_service
     }
   }
 
@@ -12,25 +12,37 @@ resource "kubernetes_deployment" "local" {
 
     selector {
       match_labels = {
-        app     = var.app
-        service = var.service
+        app     = local.k8s_app
+        service = local.k8s_service
       }
     }
 
     template {
       metadata {
         labels = {
-          app     = var.app
-          service = var.service
+          app     = local.k8s_app
+          service = local.k8s_service
         }
       }
 
       spec {
         container {
           image = "localstack/localstack:3.2.0"
-          name  = var.app
+          name  = local.k8s_app
+          env {
+            name  = "DEBUG"
+            value = 0
+          }
+          env {
+            name  = "DISABLE_CORS_CHECKS"
+            value = 1
+          }
+          env {
+            name  = "PARITY_AWS_ACCESS_KEY_ID"
+            value = 1
+          }
           port {
-            container_port = var.port
+            container_port = local.k8s_port
           }
         }
       }
@@ -38,22 +50,70 @@ resource "kubernetes_deployment" "local" {
   }
 }
 
-resource "kubernetes_service" "local" {
+resource "kubernetes_service" "this" {
   metadata {
-    name = var.service
+    name = local.k8s_service
   }
 
   spec {
     selector = {
-      app     = kubernetes_deployment.local.metadata.0.labels.app
-      service = kubernetes_deployment.local.metadata.0.labels.service
+      app     = kubernetes_deployment.this.metadata.0.labels.app
+      service = kubernetes_deployment.this.metadata.0.labels.service
     }
     type = "LoadBalancer"
     port {
       protocol = "TCP"
-      port     = var.port
+      port     = local.k8s_port
     }
   }
+}
+
+resource "aws_resourcegroups_group" "this" {
+  name = local.tf_workspace
+
+  resource_query {
+    query = <<JSON
+{
+  "ResourceTypeFilters": [
+    "AWS::AllSupported"
+  ],
+  "TagFilters": [
+    {
+      "Key": "Workspace",
+      "Values": ["${local.tf_workspace}"]
+    }
+  ]
+}
+JSON
+  }
+
+  tags = local.default_tags
+
+  depends_on = [
+    kubernetes_deployment.this,
+    kubernetes_service.this
+  ]
+}
+
+resource "aws_ssm_parameter" "statusmonitor_worker_aws_calleridentity" {
+  name  = "/${local.app_environment}/${local.app_namespace_worker}/AWS/CallerIdentity"
+  type  = "String"
+  value = var.aws_caller_identity
+
+  tags = local.default_tags
+}
+
+resource "aws_ssm_parameter" "statusmonitor_worker_aws_sourcequeue" {
+  name  = "/${local.app_environment}/${local.app_namespace_worker}/AWS/SourceQueue"
+  type  = "String"
+  value = "http://sqs.eu-west-1.localhost.localstack.cloud:4566"
+
+  tags = local.default_tags
+
+  depends_on = [
+    kubernetes_deployment.this,
+    kubernetes_service.this
+  ]
 }
 
 resource "aws_sqs_queue" "status_monitor" {
@@ -61,13 +121,11 @@ resource "aws_sqs_queue" "status_monitor" {
   fifo_queue                  = true
   content_based_deduplication = false
 
-  tags = {
-    Environment = var.environment
-  }
+  tags = local.default_tags
 
   depends_on = [
-    kubernetes_deployment.local,
-    kubernetes_service.local
+    kubernetes_deployment.this,
+    kubernetes_service.this
   ]
 }
 
@@ -76,13 +134,11 @@ resource "aws_sqs_queue" "status_monitor_events" {
   fifo_queue                  = true
   content_based_deduplication = false
 
-  tags = {
-    Environment = var.environment
-  }
+  tags = local.default_tags
 
   depends_on = [
-    kubernetes_deployment.local,
-    kubernetes_service.local
+    kubernetes_deployment.this,
+    kubernetes_service.this
   ]
 }
 
@@ -91,13 +147,11 @@ resource "aws_sns_topic" "status_monitor" {
   fifo_topic                  = true
   content_based_deduplication = false
 
-  tags = {
-    Environment = var.environment
-  }
+  tags = local.default_tags
 
   depends_on = [
-    kubernetes_deployment.local,
-    kubernetes_service.local
+    kubernetes_deployment.this,
+    kubernetes_service.this
   ]
 }
 
@@ -108,7 +162,7 @@ resource "aws_sns_topic_subscription" "status_monitor_sqs_target" {
   raw_message_delivery = true
 
   depends_on = [
-    kubernetes_deployment.local,
-    kubernetes_service.local
+    kubernetes_deployment.this,
+    kubernetes_service.this
   ]
 }

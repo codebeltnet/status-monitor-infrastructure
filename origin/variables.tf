@@ -1,24 +1,19 @@
-variable "region" {
-  description = "AWS region"
+variable "aws_region" {
+  description = "The AWS region. It will be used by the AWS provider."
   default     = "eu-west-1"
 }
 
-variable "environment" {
-  description = "Environment"
-  default     = "LocalDevelopment"
+variable "aws_access_key" {
+  description = "AWS access key. It will be used by the AWS provider."
+  default     = "AKIAIOSFODNN7EXAMPLE"
 }
 
-variable "service" {
-  description = "K8S service name"
-  default = "localstack-svc"
+variable "aws_secret_key" {
+  description = "AWS secret key. It will be used by the AWS provider."
+  default     = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 }
 
-variable "app" {
-  description = "K8S application name"
-  default = "localstack"
-}
-
-variable "port" {
-  description = "K8S service port"
-  default = 4566
+variable "aws_caller_identity" {
+  default     = "000000000000"
+  description = "A 12-digit number, such as 012345678901, that uniquely identifies an AWS account."
 }

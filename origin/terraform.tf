@@ -2,7 +2,7 @@ terraform {
   cloud {
     organization = "Geekle"
     workspaces {
-      name = "status-monitor-local"
+      name = "status-monitor-origin"
     }
   }
 
